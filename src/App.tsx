@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import LiquidGradient from './components/ui/flow-gradient-hero-section';
 import { Bento3Section } from './components/ui/bento-monochrome-1';
@@ -131,12 +131,118 @@ const ConfirmationModal = ({
   );
 };
 
+const WeeklyLogItem: React.FC<{ 
+  week: WeekEntry, 
+  onSave: (content: string, images: string[]) => void 
+}> = ({ 
+  week, 
+  onSave 
+}) => {
+  const [content, setContent] = useState(week.content);
+  const [images, setImages] = useState(week.images || []);
+  const [isSaved, setIsSaved] = useState(true);
+
+  const handleContentChange = (val: string) => {
+    setContent(val);
+    setIsSaved(false);
+  };
+
+  const handleImageUpload = (img: string) => {
+    setImages([img]);
+    setIsSaved(false);
+  };
+
+  const handleSave = () => {
+    onSave(content, images);
+    setIsSaved(true);
+  };
+
+  return (
+    <div className="glass p-20 rounded-[40px] border border-white/10 grid grid-cols-1 md:grid-cols-12 gap-16 relative overflow-hidden group">
+      {/* Background Accent */}
+      <div className="absolute top-0 right-0 w-64 h-64 bg-neon-blue/5 blur-[100px] -z-10 group-hover:bg-neon-blue/10 transition-colors duration-700" />
+      
+      <div className="md:col-span-3">
+        <div className="sticky top-40 space-y-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
+            <div className="w-1.5 h-1.5 rounded-full bg-neon-blue animate-pulse" />
+            <span className="text-[9px] font-black tracking-[0.2em] uppercase opacity-50">Active Phase</span>
+          </div>
+          <div className="text-7xl font-black tracking-tighter text-white/5 group-hover:text-neon-blue/20 transition-colors duration-700">
+            {week.week.split(' ')[1]}
+          </div>
+          <h3 className="text-2xl font-black tracking-tighter uppercase">{week.week}</h3>
+          <div className="h-[1px] w-full bg-white/5" />
+          <div className="text-[10px] font-bold opacity-30 uppercase tracking-widest">Milestone Tracking</div>
+        </div>
+      </div>
+
+      <div className="md:col-span-9 space-y-12">
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h4 className="text-[10px] font-black tracking-widest uppercase opacity-40">Process Narrative</h4>
+            {!isSaved && <span className="text-[9px] font-black text-neon-orange uppercase tracking-widest animate-pulse">Unsaved Changes</span>}
+          </div>
+          <div className="relative">
+            <textarea 
+              value={content}
+              onChange={(e) => handleContentChange(e.target.value)}
+              className="w-full p-10 bg-white/5 rounded-3xl border border-white/5 focus:border-neon-blue/30 focus:bg-white/[0.07] outline-none text-white/80 resize-none h-48 text-lg font-medium transition-all placeholder:text-white/10"
+              placeholder="Describe the week's logical flow, challenges, and breakthroughs..."
+            />
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <h4 className="text-[10px] font-black tracking-widest uppercase opacity-40">Visual Artifacts</h4>
+          <div className="grid grid-cols-1 gap-6">
+            <ImageUploader 
+              currentImage={images[0]}
+              onUpload={handleImageUpload}
+              className="aspect-video glass rounded-3xl border border-white/5 border-dashed border-2"
+              label="Upload Primary Asset"
+            />
+          </div>
+        </div>
+
+        <div className="pt-8 flex justify-end gap-4">
+          <button 
+            onClick={() => {
+              setContent(week.content);
+              setImages(week.images || []);
+              setIsSaved(true);
+            }}
+            className="px-8 py-3 glass rounded-full text-[10px] font-black tracking-widest uppercase hover:bg-white/10 transition-all border border-white/10 opacity-40 hover:opacity-100"
+          >
+            Reset
+          </button>
+          <button 
+            onClick={handleSave}
+            className={`px-8 py-3 rounded-full text-[10px] font-black tracking-widest uppercase transition-all ${
+              isSaved ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-white text-black hover:scale-105'
+            }`}
+          >
+            {isSaved ? 'Saved ✓' : 'Save Week'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function App() {
   const [view, setView] = useState<View>('home');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
+  const [projects, setProjects] = useState<Project[]>(() => {
+    const saved = localStorage.getItem('kim_serin_projects');
+    return saved ? JSON.parse(saved) : INITIAL_PROJECTS;
+  });
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem('kim_serin_projects', JSON.stringify(projects));
+  }, [projects]);
 
   const handleCategoryClick = (cat: string) => {
     setSelectedCategory(cat);
@@ -489,58 +595,13 @@ export default function App() {
                 </header>
 
                 <div className="space-y-12">
-                  {selectedProject.weeks?.map((w, i) => {
-                    const weekNum = i + 1;
-                    return (
-                      <div key={i} className="glass p-20 rounded-[40px] border border-white/10 grid grid-cols-1 md:grid-cols-12 gap-16 relative overflow-hidden group">
-                        {/* Background Accent */}
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-neon-blue/5 blur-[100px] -z-10 group-hover:bg-neon-blue/10 transition-colors duration-700" />
-                        
-                        <div className="md:col-span-3">
-                          <div className="sticky top-40 space-y-4">
-                            <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
-                              <div className="w-1.5 h-1.5 rounded-full bg-neon-blue animate-pulse" />
-                              <span className="text-[9px] font-black tracking-[0.2em] uppercase opacity-50">Active Phase</span>
-                            </div>
-                            <div className="text-7xl font-black tracking-tighter text-white/5 group-hover:text-neon-blue/20 transition-colors duration-700">
-                              {weekNum.toString().padStart(2, '0')}
-                            </div>
-                            <h3 className="text-2xl font-black tracking-tighter uppercase">{w.week}</h3>
-                            <div className="h-[1px] w-full bg-white/5" />
-                            <div className="text-[10px] font-bold opacity-30 uppercase tracking-widest">Milestone Tracking</div>
-                          </div>
-                        </div>
-
-                        <div className="md:col-span-9 space-y-12">
-                          <div className="space-y-6">
-                            <div className="flex justify-between items-center">
-                              <h4 className="text-[10px] font-black tracking-widest uppercase opacity-40">Process Narrative</h4>
-                            </div>
-                            <div className="relative">
-                              <textarea 
-                                value={w.content}
-                                onChange={(e) => updateWeek(w.week, e.target.value, w.images || [])}
-                                className="w-full p-10 bg-white/5 rounded-3xl border border-white/5 focus:border-neon-blue/30 focus:bg-white/[0.07] outline-none text-white/80 resize-none h-48 text-lg font-medium transition-all placeholder:text-white/10"
-                                placeholder="Describe the week's logical flow, challenges, and breakthroughs..."
-                              />
-                            </div>
-                          </div>
-
-                          <div className="space-y-6">
-                            <h4 className="text-[10px] font-black tracking-widest uppercase opacity-40">Visual Artifacts</h4>
-                            <div className="grid grid-cols-1 gap-6">
-                              <ImageUploader 
-                                currentImage={w.images?.[0]}
-                                onUpload={(img) => updateWeek(w.week, w.content, [img, ...(w.images?.slice(1) || [])])}
-                                className="aspect-video glass rounded-3xl border border-white/5 border-dashed border-2"
-                                label="Upload Primary Asset"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {selectedProject.weeks?.map((w, i) => (
+                    <WeeklyLogItem 
+                      key={`${selectedProject.id}-${w.week}`} 
+                      week={w} 
+                      onSave={(content, images) => updateWeek(w.week, content, images)} 
+                    />
+                  ))}
                 </div>
               </div>
             </div>
