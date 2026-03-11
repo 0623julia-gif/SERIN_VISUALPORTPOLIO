@@ -33,21 +33,22 @@ interface Project {
   statLabel: string;
   statValue: string;
   mainImage?: string;
+  projectImages?: string[];
   weeks?: WeekEntry[];
 }
 
 const INITIAL_PROJECTS: Project[] = [];
 
-const ImageUploader = ({ 
-  onUpload, 
-  currentImage, 
-  label = "Upload Graphic",
-  className = "" 
-}: { 
+const ImageUploader: React.FC<{ 
   onUpload: (base64: string) => void, 
   currentImage?: string, 
   label?: string,
   className?: string
+}> = ({ 
+  onUpload, 
+  currentImage, 
+  label = "Upload Graphic",
+  className = "" 
 }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -147,8 +148,14 @@ const WeeklyLogItem: React.FC<{
     setIsSaved(false);
   };
 
-  const handleImageUpload = (img: string) => {
-    setImages([img]);
+  const handleImageUpload = (img: string, index: number) => {
+    const newImages = [...images];
+    // Ensure the array is long enough
+    while (newImages.length <= index) {
+      newImages.push("");
+    }
+    newImages[index] = img;
+    setImages(newImages);
     setIsSaved(false);
   };
 
@@ -177,8 +184,8 @@ const WeeklyLogItem: React.FC<{
         </div>
       </div>
 
-      <div className="md:col-span-9 space-y-12">
-        <div className="space-y-6">
+      <div className="md:col-span-9 grid grid-cols-1 lg:grid-cols-12 gap-12">
+        <div className="lg:col-span-5 space-y-6">
           <div className="flex justify-between items-center">
             <h4 className="text-[10px] font-black tracking-widest uppercase opacity-40">Process Narrative</h4>
             {!isSaved && <span className="text-[9px] font-black text-neon-orange uppercase tracking-widest animate-pulse">Unsaved Changes</span>}
@@ -187,43 +194,48 @@ const WeeklyLogItem: React.FC<{
             <textarea 
               value={content}
               onChange={(e) => handleContentChange(e.target.value)}
-              className="w-full p-10 bg-white/5 rounded-3xl border border-white/5 focus:border-neon-blue/30 focus:bg-white/[0.07] outline-none text-white/80 resize-none h-48 text-lg font-medium transition-all placeholder:text-white/10"
+              className="w-full p-8 bg-white/5 rounded-3xl border border-white/5 focus:border-neon-blue/30 focus:bg-white/[0.07] outline-none text-white/80 resize-none h-64 text-base font-medium transition-all placeholder:text-white/10"
               placeholder="Describe the week's logical flow, challenges, and breakthroughs..."
             />
           </div>
-        </div>
-
-        <div className="space-y-6">
-          <h4 className="text-[10px] font-black tracking-widest uppercase opacity-40">Visual Artifacts</h4>
-          <div className="grid grid-cols-1 gap-6">
-            <ImageUploader 
-              currentImage={images[0]}
-              onUpload={handleImageUpload}
-              className="aspect-video glass rounded-3xl border border-white/5 border-dashed border-2"
-              label="Upload Primary Asset"
-            />
+          
+          <div className="pt-8 flex justify-end gap-4">
+            <button 
+              onClick={() => {
+                setContent(week.content);
+                setImages(week.images || []);
+                setIsSaved(true);
+              }}
+              className="px-6 py-3 glass rounded-full text-[9px] font-black tracking-widest uppercase hover:bg-white/10 transition-all border border-white/10 opacity-40 hover:opacity-100"
+            >
+              Reset
+            </button>
+            <button 
+              onClick={handleSave}
+              className={`px-6 py-3 rounded-full text-[9px] font-black tracking-widest uppercase transition-all ${
+                isSaved ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-white text-black hover:scale-105'
+              }`}
+            >
+              {isSaved ? 'Saved ✓' : 'Save Week'}
+            </button>
           </div>
         </div>
 
-        <div className="pt-8 flex justify-end gap-4">
-          <button 
-            onClick={() => {
-              setContent(week.content);
-              setImages(week.images || []);
-              setIsSaved(true);
-            }}
-            className="px-8 py-3 glass rounded-full text-[10px] font-black tracking-widest uppercase hover:bg-white/10 transition-all border border-white/10 opacity-40 hover:opacity-100"
-          >
-            Reset
-          </button>
-          <button 
-            onClick={handleSave}
-            className={`px-8 py-3 rounded-full text-[10px] font-black tracking-widest uppercase transition-all ${
-              isSaved ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-white text-black hover:scale-105'
-            }`}
-          >
-            {isSaved ? 'Saved ✓' : 'Save Week'}
-          </button>
+        <div className="lg:col-span-7 space-y-6">
+          <h4 className="text-[10px] font-black tracking-widest uppercase opacity-40">Visual Artifacts</h4>
+          <div className="grid grid-cols-2 gap-4">
+            {[0, 1, 2, 3, 4].map((idx) => (
+              <ImageUploader 
+                key={idx}
+                currentImage={images[idx]}
+                onUpload={(img) => handleImageUpload(img, idx)}
+                className={`glass rounded-2xl border border-white/5 border-dashed border-2 ${
+                  idx === 0 ? "col-span-2 aspect-video" : "aspect-square"
+                }`}
+                label={idx === 0 ? "Primary Visual" : `Asset ${idx + 1}`}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -480,11 +492,26 @@ export default function App() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
                   <div className="lg:col-span-8 space-y-12">
-                    <ImageUploader 
-                      currentImage={selectedProject.mainImage}
-                      onUpload={(img) => updateProject({ ...selectedProject, mainImage: img })}
-                      className="glass rounded-2xl aspect-video border border-white/10"
-                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      {[0, 1, 2, 3, 4].map((idx) => (
+                        <ImageUploader 
+                          key={idx}
+                          currentImage={selectedProject.projectImages?.[idx] || (idx === 0 ? selectedProject.mainImage : undefined)}
+                          onUpload={(img) => {
+                            const newImages = [...(selectedProject.projectImages || [])];
+                            while (newImages.length <= idx) newImages.push("");
+                            newImages[idx] = img;
+                            const update: Partial<Project> = { projectImages: newImages };
+                            if (idx === 0) update.mainImage = img;
+                            updateProject({ ...selectedProject, ...update });
+                          }}
+                          className={`glass rounded-2xl border border-white/10 border-dashed border-2 ${
+                            idx === 0 ? "col-span-2 aspect-video" : "aspect-square"
+                          }`}
+                          label={idx === 0 ? "Main Project Visual" : `Project Asset ${idx + 1}`}
+                        />
+                      ))}
+                    </div>
                     
                     <div className="glass p-24 rounded-3xl space-y-16 border border-white/10">
                       <div className="space-y-8">
