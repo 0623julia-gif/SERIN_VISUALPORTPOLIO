@@ -3,6 +3,8 @@ import { createServer as createViteServer } from "vite";
 import Database from "better-sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
+import { createServer } from "http";
+import { Server } from "socket.io";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,8 +19,12 @@ db.exec(`
   )
 `);
 
+const POST_PASSWORD = "0613";
+
 async function startServer() {
   const app = express();
+  const httpServer = createServer(app);
+  const io = new Server(httpServer);
   const PORT = 3000;
 
   // Increase payload limit for large images (100MB)
@@ -33,14 +39,33 @@ async function startServer() {
   });
 
   app.post("/api/projects", (req, res) => {
-    const project = req.body;
+    const { project, password } = req.body;
+    
+    if (password !== POST_PASSWORD) {
+      return res.status(401).json({ error: "Invalid password" });
+    }
+
     db.prepare("INSERT OR REPLACE INTO projects (id, data) VALUES (?, ?)")
       .run(project.id, JSON.stringify(project));
+    
+    // Broadcast update to all clients
+    io.emit("projects:updated");
+    
     res.json({ success: true });
   });
 
   app.delete("/api/projects/:id", (req, res) => {
+    const { password } = req.body;
+
+    if (password !== POST_PASSWORD) {
+      return res.status(401).json({ error: "Invalid password" });
+    }
+
     db.prepare("DELETE FROM projects WHERE id = ?").run(req.params.id);
+    
+    // Broadcast update to all clients
+    io.emit("projects:updated");
+    
     res.json({ success: true });
   });
 
@@ -58,7 +83,7 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }

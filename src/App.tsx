@@ -13,6 +13,9 @@ import { DataProcessTimeline } from './components/DataProcessTimeline';
 import { ContrastSlider } from './components/ContrastSlider';
 import { VideoPlayer } from './components/VideoPlayer';
 import { ArrowLeft, ChevronDown, Upload } from 'lucide-react';
+import { io } from 'socket.io-client';
+
+const socket = io();
 
 type View = 'home' | 'category' | 'project' | 'weekly-detail';
 
@@ -247,25 +250,113 @@ const WeeklyLogItem: React.FC<{
   );
 };
 
+const PasswordModal = ({ 
+  isOpen, 
+  onConfirm, 
+  onCancel,
+  title = "비밀번호를 입력하시오"
+}: { 
+  isOpen: boolean, 
+  onConfirm: (password: string) => void, 
+  onCancel: () => void,
+  title?: string
+}) => {
+  const [password, setPassword] = useState("");
+
+  useEffect(() => {
+    if (isOpen) setPassword("");
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6">
+      <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" onClick={onCancel} />
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="relative glass p-12 rounded-[40px] max-w-sm w-full text-center space-y-8 border border-white/20 shadow-2xl"
+      >
+        <div className="space-y-2">
+          <h3 className="text-xl font-black tracking-tighter uppercase text-white">{title}</h3>
+          <p className="text-[10px] font-bold tracking-widest uppercase opacity-40">Security Verification Required</p>
+        </div>
+        
+        <input 
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoFocus
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              onConfirm(password);
+            }
+            if (e.key === 'Escape') onCancel();
+          }}
+          className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-center text-2xl tracking-[0.5em] focus:border-neon-blue/50 outline-none transition-all text-white"
+          placeholder="••••"
+        />
+
+        <div className="flex gap-4">
+          <button 
+            type="button"
+            onClick={onCancel}
+            className="flex-1 py-4 glass rounded-full text-[10px] font-black tracking-widest uppercase hover:bg-white/10 transition-all border border-white/10 text-white"
+          >
+            Cancel
+          </button>
+          <button 
+            type="button"
+            onClick={() => onConfirm(password)}
+            className="flex-1 py-4 bg-white text-black rounded-full text-[10px] font-black tracking-widest uppercase hover:scale-105 transition-transform"
+          >
+            Verify
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 export default function App() {
   const [view, setView] = useState<View>('home');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
+  const [passwordModal, setPasswordModal] = useState<{
+    isOpen: boolean;
+    onConfirm: (password: string) => void;
+    title?: string;
+  }>({ isOpen: false, onConfirm: () => {} });
+
+  const openPasswordModal = (onConfirm: (password: string) => void, title?: string) => {
+    setPasswordModal({ isOpen: true, onConfirm, title });
+  };
 
   // Initial load from Server
+  const loadData = async () => {
+    try {
+      const response = await fetch('/api/projects');
+      const data = await response.json();
+      setProjects(data);
+    } catch (err) {
+      console.error("Failed to load data from server", err);
+    }
+  };
+
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const response = await fetch('/api/projects');
-        const data = await response.json();
-        setProjects(data);
-      } catch (err) {
-        console.error("Failed to load data from server", err);
-      }
-    };
     loadData();
+
+    // Listen for real-time updates
+    socket.on('projects:updated', () => {
+      loadData();
+    });
+
+    return () => {
+      socket.off('projects:updated');
+    };
   }, []);
 
   const handleCategoryClick = (cat: string) => {
@@ -286,61 +377,102 @@ export default function App() {
   };
 
   const addMockProject = async () => {
-    const newProject: Project = {
-      id: Math.random().toString(36).substr(2, 9),
-      title: `New ${selectedCategory} Project`,
-      category: selectedCategory || 'Visual Design',
-      year: new Date().getFullYear().toString(),
-      description: 'A newly created project demonstrating the dynamic system capability.',
-      variant: ['orbit', 'relay', 'wave', 'spark', 'loop'][Math.floor(Math.random() * 5)],
-      meta: 'New',
-      statLabel: 'Status',
-      statValue: 'Live',
-      weeks: Array.from({ length: 15 }).map((_, i) => ({
-        week: `Week ${(i + 1).toString().padStart(2, '0')}`,
-        content: '',
-        images: []
-      }))
-    };
-    
-    try {
-      await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newProject)
-      });
-      setProjects([...projects, newProject]);
-      handleProjectClick(newProject);
-    } catch (err) {
-      console.error("Failed to save project to server", err);
-    }
+    console.log("addMockProject called");
+    openPasswordModal(async (password) => {
+      console.log("Password submitted");
+      if (password !== "0613") {
+        alert("비밀번호가 틀렸습니다.");
+        return;
+      }
+
+      setPasswordModal(prev => ({ ...prev, isOpen: false }));
+
+      const newProject: Project = {
+        id: Math.random().toString(36).substr(2, 9),
+        title: `New ${selectedCategory} Project`,
+        category: selectedCategory || 'Visual Design',
+        year: new Date().getFullYear().toString(),
+        description: 'A newly created project demonstrating the dynamic system capability.',
+        variant: ['orbit', 'relay', 'wave', 'spark', 'loop'][Math.floor(Math.random() * 5)],
+        meta: 'New',
+        statLabel: 'Status',
+        statValue: 'Live',
+        weeks: Array.from({ length: 15 }).map((_, i) => ({
+          week: `Week ${(i + 1).toString().padStart(2, '0')}`,
+          content: '',
+          images: []
+        }))
+      };
+      
+      try {
+        const res = await fetch('/api/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ project: newProject, password })
+        });
+        
+        if (res.status === 401) {
+          alert("비밀번호가 틀렸습니다.");
+          return;
+        }
+
+        setProjects(prev => [...prev, newProject]);
+        handleProjectClick(newProject);
+      } catch (err) {
+        console.error("Failed to save project to server", err);
+      }
+    });
   };
 
   const deleteProject = async (id: string) => {
-    try {
-      await fetch(`/api/projects/${id}`, { method: 'DELETE' });
-      setProjects(projects.filter(p => p.id !== id));
-      setProjectToDelete(null);
-      if (selectedProject?.id === id) {
-        setView('category');
+    openPasswordModal(async (password) => {
+      setPasswordModal(prev => ({ ...prev, isOpen: false }));
+
+      try {
+        const res = await fetch(`/api/projects/${id}`, { 
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password })
+        });
+
+        if (res.status === 401) {
+          alert("비밀번호가 틀렸습니다.");
+          return;
+        }
+
+        setProjects(projects.filter(p => p.id !== id));
+        setProjectToDelete(null);
+        if (selectedProject?.id === id) {
+          setView('category');
+        }
+      } catch (err) {
+        console.error("Failed to delete project from server", err);
       }
-    } catch (err) {
-      console.error("Failed to delete project from server", err);
-    }
+    });
   };
 
   const updateProject = async (updatedProject: Project) => {
-    try {
-      await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedProject)
-      });
-      setProjects(projects.map(p => p.id === updatedProject.id ? updatedProject : p));
-      setSelectedProject(updatedProject);
-    } catch (err) {
-      console.error("Failed to update project on server", err);
-    }
+    openPasswordModal(async (password) => {
+      setPasswordModal(prev => ({ ...prev, isOpen: false }));
+
+      try {
+        const res = await fetch('/api/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ project: updatedProject, password })
+        });
+
+        if (res.status === 401) {
+          alert("비밀번호가 틀렸습니다.");
+          return;
+        }
+
+        setProjects(projects.map(p => p.id === updatedProject.id ? updatedProject : p));
+        setSelectedProject(updatedProject);
+      } catch (err) {
+        console.error("Failed to update project on server", err);
+      }
+    });
   };
 
   const updateWeek = (weekLabel: string, content: string, images: string[]) => {
@@ -677,6 +809,13 @@ export default function App() {
         message="Are you sure you want to delete this project?"
         onConfirm={() => projectToDelete && deleteProject(projectToDelete)}
         onCancel={() => setProjectToDelete(null)}
+      />
+
+      <PasswordModal 
+        isOpen={passwordModal.isOpen}
+        title={passwordModal.title}
+        onConfirm={passwordModal.onConfirm}
+        onCancel={() => setPasswordModal(prev => ({ ...prev, isOpen: false }))}
       />
 
       <footer className="max-w-7xl mx-auto mb-12 glass rounded-[32px] py-12 px-6 text-center space-y-3">
