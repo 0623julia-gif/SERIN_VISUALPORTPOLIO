@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { get, set } from 'idb-keyval';
 import LiquidGradient from './components/ui/flow-gradient-hero-section';
 import { Bento3Section } from './components/ui/bento-monochrome-1';
 import { CategoryCard } from './components/CategoryCard';
@@ -55,6 +56,11 @@ const ImageUploader: React.FC<{
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // 100MB limit check
+      if (file.size > 100 * 1024 * 1024) {
+        alert("파일 용량이 100MB를 초과합니다. (File size exceeds 100MB)");
+        return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         onUpload(reader.result as string);
@@ -245,16 +251,40 @@ const WeeklyLogItem: React.FC<{
 export default function App() {
   const [view, setView] = useState<View>('home');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [projects, setProjects] = useState<Project[]>(() => {
-    const saved = localStorage.getItem('kim_serin_projects');
-    return saved ? JSON.parse(saved) : INITIAL_PROJECTS;
-  });
+  const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
 
+  // Initial load from IndexedDB
   useEffect(() => {
-    localStorage.setItem('kim_serin_projects', JSON.stringify(projects));
-  }, [projects]);
+    const loadData = async () => {
+      try {
+        const saved = await get('kim_serin_projects');
+        if (saved) {
+          setProjects(saved);
+        } else {
+          // Fallback to localStorage for migration if exists
+          const legacy = localStorage.getItem('kim_serin_projects');
+          if (legacy) setProjects(JSON.parse(legacy));
+        }
+      } catch (err) {
+        console.error("Failed to load data from IndexedDB", err);
+      } finally {
+        setIsDataLoaded(true);
+      }
+    };
+    loadData();
+  }, []);
+
+  // Save to IndexedDB
+  useEffect(() => {
+    if (isDataLoaded) {
+      set('kim_serin_projects', projects).catch(err => {
+        console.error("Failed to save data to IndexedDB", err);
+      });
+    }
+  }, [projects, isDataLoaded]);
 
   const handleCategoryClick = (cat: string) => {
     setSelectedCategory(cat);
