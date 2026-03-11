@@ -72,14 +72,14 @@ class GradientBackground {
       uTime: { value: 0 },
       uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
       uColor1: { value: new THREE.Vector3(0.945, 0.353, 0.133) },
-      uColor2: { value: new THREE.Vector3(0.039, 0.055, 0.153) },
+      uColor2: { value: new THREE.Vector3(0.0196, 0.0274, 0.1098) },
       uColor3: { value: new THREE.Vector3(0.945, 0.353, 0.133) },
-      uColor4: { value: new THREE.Vector3(0.039, 0.055, 0.153) },
+      uColor4: { value: new THREE.Vector3(0.0196, 0.0274, 0.1098) },
       uColor5: { value: new THREE.Vector3(0.945, 0.353, 0.133) },
-      uColor6: { value: new THREE.Vector3(0.039, 0.055, 0.153) },
+      uColor6: { value: new THREE.Vector3(0.0196, 0.0274, 0.1098) },
       uSpeed: { value: 1.0 }, uIntensity: { value: 2.2 },
       uTouchTexture: { value: null }, uGrainIntensity: { value: 0.05 },
-      uDarkNavy: { value: new THREE.Vector3(0.039, 0.055, 0.153) },
+      uDarkNavy: { value: new THREE.Vector3(0.0196, 0.0274, 0.1098) },
       uGradientSize: { value: 0.55 }, uGradientCount: { value: 12.0 },
       uColor1Weight: { value: 0.65 }, uColor2Weight: { value: 1.6 }
     };
@@ -191,16 +191,16 @@ class GradientBackground {
   }
   update(delta: number) { if (!this.isPaused) this.uniforms.uTime.value += delta; }
   setTheme(isDark: boolean) {
+    // Always use #05071C for background regardless of theme
+    this.uniforms.uDarkNavy.value.set(0.0196, 0.0274, 0.1098);
+    this.sceneManager.scene.background = new THREE.Color(0x05071c);
+
     if (isDark) {
       this.uniforms.uColor1.value.set(0.945, 0.353, 0.133);
-      this.uniforms.uColor2.value.set(0.039, 0.055, 0.153);
-      this.uniforms.uDarkNavy.value.set(0.039, 0.055, 0.153);
-      this.sceneManager.scene.background = new THREE.Color(0x0a0e27);
+      this.uniforms.uColor2.value.set(0.0196, 0.0274, 0.1098);
     } else {
       this.uniforms.uColor1.value.set(1.0, 0.5, 0.35);
-      this.uniforms.uColor2.value.set(0.9, 0.95, 1.0);
-      this.uniforms.uDarkNavy.value.set(0.95, 0.97, 1.0);
-      this.sceneManager.scene.background = new THREE.Color(0xf5f7ff);
+      this.uniforms.uColor2.value.set(0.0196, 0.0274, 0.1098);
     }
   }
   onResize(w: number, h: number) {
@@ -223,7 +223,7 @@ class App {
     this.camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 10000);
     this.camera.position.z = 50;
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0a0e27);
+    this.scene.background = new THREE.Color(0x05071c);
     this.clock = new THREE.Clock();
     this.touchTexture = new TouchTexture();
     this.gradientBackground = new GradientBackground(this);

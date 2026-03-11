@@ -5,7 +5,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { get, set } from 'idb-keyval';
 import LiquidGradient from './components/ui/flow-gradient-hero-section';
 import { Bento3Section } from './components/ui/bento-monochrome-1';
 import { CategoryCard } from './components/CategoryCard';
@@ -200,7 +199,7 @@ const WeeklyLogItem: React.FC<{
             <textarea 
               value={content}
               onChange={(e) => handleContentChange(e.target.value)}
-              className="w-full p-8 bg-white/5 rounded-3xl border border-white/5 focus:border-neon-blue/30 focus:bg-white/[0.07] outline-none text-white/80 resize-none h-64 text-base font-medium transition-all placeholder:text-white/10"
+              className="w-full p-8 bg-white/5 rounded-3xl border border-white/5 focus:border-neon-blue/30 focus:bg-white/[0.07] outline-none text-white/80 resize-none h-64 text-xs font-medium transition-all placeholder:text-white/10"
               placeholder="Describe the week's logical flow, challenges, and breakthroughs..."
             />
           </div>
@@ -235,8 +234,8 @@ const WeeklyLogItem: React.FC<{
                 key={idx}
                 currentImage={images[idx]}
                 onUpload={(img) => handleImageUpload(img, idx)}
-                className={`glass rounded-2xl border border-white/5 border-dashed border-2 ${
-                  idx === 0 ? "col-span-2 aspect-video" : "aspect-square"
+                className={`glass rounded-2xl border border-white/5 border-dashed border-2 aspect-[16/9] ${
+                  idx === 0 ? "col-span-2" : ""
                 }`}
                 label={idx === 0 ? "Primary Visual" : `Asset ${idx + 1}`}
               />
@@ -252,39 +251,22 @@ export default function App() {
   const [view, setView] = useState<View>('home');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
-  const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
 
-  // Initial load from IndexedDB
+  // Initial load from Server
   useEffect(() => {
     const loadData = async () => {
       try {
-        const saved = await get('kim_serin_projects');
-        if (saved) {
-          setProjects(saved);
-        } else {
-          // Fallback to localStorage for migration if exists
-          const legacy = localStorage.getItem('kim_serin_projects');
-          if (legacy) setProjects(JSON.parse(legacy));
-        }
+        const response = await fetch('/api/projects');
+        const data = await response.json();
+        setProjects(data);
       } catch (err) {
-        console.error("Failed to load data from IndexedDB", err);
-      } finally {
-        setIsDataLoaded(true);
+        console.error("Failed to load data from server", err);
       }
     };
     loadData();
   }, []);
-
-  // Save to IndexedDB
-  useEffect(() => {
-    if (isDataLoaded) {
-      set('kim_serin_projects', projects).catch(err => {
-        console.error("Failed to save data to IndexedDB", err);
-      });
-    }
-  }, [projects, isDataLoaded]);
 
   const handleCategoryClick = (cat: string) => {
     setSelectedCategory(cat);
@@ -303,7 +285,7 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const addMockProject = () => {
+  const addMockProject = async () => {
     const newProject: Project = {
       id: Math.random().toString(36).substr(2, 9),
       title: `New ${selectedCategory} Project`,
@@ -320,21 +302,45 @@ export default function App() {
         images: []
       }))
     };
-    setProjects([...projects, newProject]);
-    handleProjectClick(newProject);
-  };
-
-  const deleteProject = (id: string) => {
-    setProjects(projects.filter(p => p.id !== id));
-    setProjectToDelete(null);
-    if (selectedProject?.id === id) {
-      setView('category');
+    
+    try {
+      await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newProject)
+      });
+      setProjects([...projects, newProject]);
+      handleProjectClick(newProject);
+    } catch (err) {
+      console.error("Failed to save project to server", err);
     }
   };
 
-  const updateProject = (updatedProject: Project) => {
-    setProjects(projects.map(p => p.id === updatedProject.id ? updatedProject : p));
-    setSelectedProject(updatedProject);
+  const deleteProject = async (id: string) => {
+    try {
+      await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+      setProjects(projects.filter(p => p.id !== id));
+      setProjectToDelete(null);
+      if (selectedProject?.id === id) {
+        setView('category');
+      }
+    } catch (err) {
+      console.error("Failed to delete project from server", err);
+    }
+  };
+
+  const updateProject = async (updatedProject: Project) => {
+    try {
+      await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedProject)
+      });
+      setProjects(projects.map(p => p.id === updatedProject.id ? updatedProject : p));
+      setSelectedProject(updatedProject);
+    } catch (err) {
+      console.error("Failed to update project on server", err);
+    }
   };
 
   const updateWeek = (weekLabel: string, content: string, images: string[]) => {
@@ -535,8 +541,8 @@ export default function App() {
                             if (idx === 0) update.mainImage = img;
                             updateProject({ ...selectedProject, ...update });
                           }}
-                          className={`glass rounded-2xl border border-white/10 border-dashed border-2 ${
-                            idx === 0 ? "col-span-2 aspect-video" : "aspect-square"
+                          className={`glass rounded-2xl border border-white/10 border-dashed border-2 aspect-[16/9] ${
+                            idx === 0 ? "col-span-2" : ""
                           }`}
                           label={idx === 0 ? "Main Project Visual" : `Project Asset ${idx + 1}`}
                         />
@@ -557,7 +563,7 @@ export default function App() {
                         <textarea 
                           value={selectedProject.description}
                           onChange={(e) => updateProject({ ...selectedProject, description: e.target.value })}
-                          className="w-full bg-transparent text-xl text-white/70 leading-relaxed font-medium outline-none resize-none h-32 focus:text-white transition-colors"
+                          className="w-full bg-transparent text-base text-white/70 leading-relaxed font-medium outline-none resize-none h-32 focus:text-white transition-colors"
                         />
                       </div>
 
@@ -566,7 +572,7 @@ export default function App() {
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
                           {selectedProject.weeks?.map((w, idx) => (
                             <div key={idx} className="space-y-2">
-                              <div className="aspect-square glass rounded-xl overflow-hidden border border-white/5">
+                              <div className="aspect-[16/9] glass rounded-xl overflow-hidden border border-white/5">
                                 {w.images && w.images.length > 0 ? (
                                   <img src={w.images[0]} alt={w.week} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                 ) : (

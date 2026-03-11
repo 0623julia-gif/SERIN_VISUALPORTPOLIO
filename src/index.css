@@ -3,9 +3,9 @@
 
 @theme {
   --font-sans: "Pretendard", "Inter", ui-sans-serif, system-ui, sans-serif;
-  --color-neon-blue: #001AFF;
+  --color-neon-blue: #3355FF;
   --color-neon-orange: #FF4D00;
-  --color-deep-black: #050505;
+  --color-deep-black: #05071C;
 }
 
 @layer base {
